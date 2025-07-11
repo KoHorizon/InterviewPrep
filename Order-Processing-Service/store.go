@@ -1,4 +1,3 @@
-// store.go
 package main
 
 import (
@@ -16,9 +15,8 @@ type Store struct {
 
 func NewStore() *Store {
 	return &Store{
-		products:     make(map[string]Product),
-		orders:       make(map[string]Order),
-		orderCounter: 0,
+		products: make(map[string]Product),
+		orders:   make(map[string]Order),
 	}
 }
 
@@ -46,29 +44,27 @@ func (s *Store) CreateOrder(customerID string, items []OrderItem) (Order, error)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Validate inventory and calculate total
-	var total float64
+	// First, validate all items have sufficient stock
 	for _, item := range items {
 		product, exists := s.products[item.ProductID]
 		if !exists {
-			return Order{}, fmt.Errorf("product %s not found", item.ProductID)
+			return Order{}, fmt.Errorf("product not found: %s", item.ProductID)
 		}
 		if product.Stock < item.Quantity {
-			return Order{}, fmt.Errorf("insufficient stock for product %s", item.ProductID)
+			return Order{}, fmt.Errorf("insufficient stock for product %s: available %d, requested %d",
+				item.ProductID, product.Stock, item.Quantity)
 		}
+	}
+
+	// Calculate total
+	var total float64
+	for _, item := range items {
 		total += item.Price * float64(item.Quantity)
 	}
 
 	// Generate order ID
 	s.orderCounter++
 	orderID := fmt.Sprintf("order_%d", s.orderCounter)
-
-	// Deduct inventory
-	for _, item := range items {
-		product := s.products[item.ProductID]
-		product.Stock -= item.Quantity
-		s.products[item.ProductID] = product
-	}
 
 	// Create order
 	order := Order{
@@ -80,7 +76,16 @@ func (s *Store) CreateOrder(customerID string, items []OrderItem) (Order, error)
 		CreatedAt:  time.Now(),
 	}
 
+	// Deduct inventory only after order is created
+	for _, item := range items {
+		product := s.products[item.ProductID]
+		product.Stock -= item.Quantity
+		s.products[item.ProductID] = product
+	}
+
+	// Save order
 	s.orders[orderID] = order
+
 	return order, nil
 }
 
@@ -88,13 +93,15 @@ func (s *Store) CancelOrder(orderID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// Check if order exists
 	order, exists := s.orders[orderID]
 	if !exists {
-		return fmt.Errorf("order %s not found", orderID)
+		return fmt.Errorf("order not found: %s", orderID)
 	}
 
+	// Check if order can be cancelled
 	if order.Status != "pending" {
-		return fmt.Errorf("order %s cannot be cancelled, status: %s", orderID, order.Status)
+		return fmt.Errorf("cannot cancel order with status: %s", order.Status)
 	}
 
 	// Restore inventory

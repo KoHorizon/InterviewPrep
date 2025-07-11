@@ -2,6 +2,7 @@ package main
 
 import "time"
 
+// Domain models
 type Product struct {
 	ID    string  `json:"id"`
 	Name  string  `json:"name"`
@@ -19,18 +20,20 @@ type Order struct {
 	ID         string      `json:"id"`
 	CustomerID string      `json:"customer_id"`
 	Items      []OrderItem `json:"items"`
-	Status     string      `json:"status"`
+	Status     string      `json:"status"` // "pending", "confirmed", "cancelled"
 	Total      float64     `json:"total"`
 	CreatedAt  time.Time   `json:"created_at"`
 }
 
 // Request/Response DTOs
 type CreateOrderRequest struct {
-	CustomerID string `json:"customer_id"`
-	Items      []struct {
-		ProductID string `json:"product_id"`
-		Quantity  int    `json:"quantity"`
-	} `json:"items"`
+	CustomerID string                   `json:"customer_id"`
+	Items      []CreateOrderRequestItem `json:"items"`
+}
+
+type CreateOrderRequestItem struct {
+	ProductID string `json:"product_id"`
+	Quantity  int    `json:"quantity"`
 }
 
 type ErrorResponse struct {
